@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Build output (make app) and Xcode, if you open Package.swift in it
+build/
+xcuserdata/
+DerivedData/
+*.xcresult
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Model weights
+*.gguf
