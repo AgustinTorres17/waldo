@@ -30,11 +30,25 @@ struct PopupView: View {
     @ObservedObject var model: PopupModel
     @ObservedObject var settings: SettingsStore
 
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: Theme.popupRadius, style: .continuous) }
+
     var body: some View {
         content
-            .background(Theme.background, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border))
+            .surface(.popup, cornerRadius: Theme.popupRadius)
+            .overlay(shape.strokeBorder(Theme.border))
+            .overlay {
+                // Glass catches light along its top edge.
+                if Theme.isGlass {
+                    shape.inset(by: 1)
+                        .strokeBorder(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0)],
+                                                     startPoint: .top, endPoint: .center))
+                }
+            }
+            .clipShape(shape)
             .fixedSize()
+            .tint(Theme.accent)
+            // Theme colors resolve when drawn: a new theme rebuilds the popup.
+            .id(settings.appTheme)
     }
 
     @ViewBuilder
@@ -42,34 +56,40 @@ struct PopupView: View {
         switch model.state {
         case .compact:
             HStack(spacing: 2) {
-                MonoMenuPicker(selection: languageBinding, options: TargetLanguage.allCases) { $0.displayName }
+                MonoMenuPicker(selection: languageBinding, options: TargetLanguage.allCases, style: .chip,
+                               icon: "globe") { $0.displayName }
                     .help(settings.hasRule(for: model.appBundleID) ? "Language for this app" : "Default language")
                 if !settings.customModes.isEmpty {
-                    MonoMenuPicker(selection: modeBinding,
-                                   options: [nil] + settings.customModes.map(\.id)) { id in
+                    MonoMenuPicker(selection: modeBinding, options: [nil] + settings.customModes.map(\.id),
+                                   style: .chip, icon: "theatermasks") { id in
                         settings.customModes.first { $0.id == id }?.name ?? "No mode"
                     }
                     .help(settings.hasRule(for: model.appBundleID) ? "Mode for this app" : "Default mode")
-                    .padding(.leading, 2)
                 }
-                Spacer().frame(width: 2)
-                actionButton("Translate / Correct", icon: "character.bubble", mode: .automatic)
+                Rectangle().fill(Theme.divider).frame(width: 1, height: 16)
+                    .padding(.horizontal, 4)
+                actionButton("Translate / Correct", icon: "character.bubble.fill", mode: .automatic)
                 actionButton("Rephrase", icon: "wand.and.stars", mode: .rephrase)
                 closeButton
             }
-            .padding(4)
+            .padding(5)
         case .streaming(let text):
             card(text: AttributedString(text), copyText: text, canReplace: false, isStreaming: true) {
+                PulsingDot()
                 Text("Writing…")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.tertiaryText)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.secondaryText)
+                Spacer(minLength: 8)
             }
         case .result(let text, let summary, let changed, let changes):
             let shown = settings.showChanges ? changes.map(Self.highlighted) ?? AttributedString(text) : AttributedString(text)
             card(text: shown, copyText: text, canReplace: changed, isStreaming: false) {
+                Image(systemName: changed ? "sparkles" : "checkmark.seal.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.accentFill)
                 Text(summary)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.tertiaryText)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.secondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
@@ -83,18 +103,20 @@ struct PopupView: View {
                 }
             }
         case .error(let message):
-            messageRow(message, icon: "exclamationmark.circle")
+            messageRow(message, icon: "exclamationmark", tint: Theme.danger)
         case .note(let message):
-            messageRow(message, icon: "checkmark.circle")
+            messageRow(message, icon: "checkmark", tint: Theme.success)
         }
     }
 
-    private func messageRow(_ message: String, icon: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
+    private func messageRow(_ message: String, icon: String, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.secondaryText)
-                .padding(.top, 3)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(tint)
+                .frame(width: 20, height: 20)
+                .background(tint.opacity(0.14), in: Circle())
+                .padding(.top, 1)
             Text(message)
                 .font(.system(size: 12.5))
                 .foregroundStyle(Theme.text)
@@ -105,8 +127,8 @@ struct PopupView: View {
             closeButton
         }
         .padding(.leading, 12)
-        .padding(.vertical, 6)
-        .padding(.trailing, 6)
+        .padding(.vertical, 8)
+        .padding(.trailing, 7)
     }
 
     /// The result layout, also used while it's being written so the panel doesn't
@@ -116,35 +138,40 @@ struct PopupView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 header()
-                Spacer(minLength: 8)
                 closeButton
             }
-            .padding(.leading, 14)
-            .padding([.top, .trailing], 6)
+            .padding(.leading, 16)
+            .padding([.top, .trailing], 7)
 
             ResultText(text: text, isStreaming: isStreaming)
+                .padding(.top, 2)
 
             if model.isHotkeyRun {
-                Spacer().frame(height: 10)
+                Spacer().frame(height: 12)
             } else {
-                Rectangle().fill(Theme.divider).frame(height: 1)
-                    .padding(.top, 10)
-
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Spacer()
-                    Button("Copy") { model.onCopy(copyText) }
-                        .buttonStyle(.monoGhost)
-                        .disabled(isStreaming)
-                    Button("Replace") { model.onReplace(copyText) }
-                        .buttonStyle(.monoPrimary)
-                        .disabled(isStreaming || !canReplace || model.isReplacing)
+                    Button { model.onCopy(copyText) } label: {
+                        Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.monoSecondary)
+                    .disabled(isStreaming)
+                    Button { model.onReplace(copyText) } label: {
+                        Label("Replace", systemImage: "arrow.turn.down.left")
+                    }
+                    .buttonStyle(.monoPrimary)
+                    .disabled(isStreaming || !canReplace || model.isReplacing)
                 }
-                .padding(8)
+                .labelStyle(CompactLabelStyle())
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(Theme.popupFooter)
+                .overlay(alignment: .top) { SettingsDivider() }
+                .padding(.top, 12)
             }
         }
-        .frame(width: 360)
+        .frame(width: 380)
     }
-
 
     /// Added words on a tint, removed words struck through. A space only on screen
     /// keeps "was" and "were" from reading as one word; Copy and Replace use `text`.
@@ -184,9 +211,10 @@ struct PopupView: View {
         Button { model.onProcess(mode) } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.secondaryText)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Theme.accentFill)
                 Text(title)
+                    .fontWeight(.medium)
             }
         }
         .buttonStyle(.monoGhost)
@@ -198,6 +226,32 @@ struct PopupView: View {
         }
         .buttonStyle(.icon)
         .help("Close (Esc)")
+    }
+}
+
+/// Icon and title, closer together than the default.
+private struct CompactLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: 5) {
+            configuration.icon.font(.system(size: 10.5, weight: .semibold))
+            configuration.title
+        }
+    }
+}
+
+/// A small accent dot that breathes while Waldo writes.
+private struct PulsingDot: View {
+    @State private var isDim = false
+
+    var body: some View {
+        Circle()
+            .fill(Theme.accentFill)
+            .frame(width: 7, height: 7)
+            .opacity(isDim ? 0.35 : 1)
+            .scaleEffect(isDim ? 0.8 : 1)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { isDim = true }
+            }
     }
 }
 
@@ -224,12 +278,12 @@ private struct ResultText: View {
                         let caretOn = Int(context.date.timeIntervalSinceReferenceDate * 2) % 2 == 0
                         Text(isStreaming ? text + Self.caret(visible: caretOn) : text)
                     }
-                    .font(.system(size: 13))
+                    .font(Theme.resultFont)
                     .foregroundStyle(Theme.text)
-                    .lineSpacing(3)
+                    .lineSpacing(3.5)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 4)
                     Color.clear.frame(height: 1).id(Self.end)
                         .background(GeometryReader { geometry in
@@ -275,7 +329,7 @@ private struct ResultText: View {
 
     private static func caret(visible: Bool) -> AttributedString {
         var caret = AttributedString("▍")
-        caret.foregroundColor = visible ? Theme.secondaryText : .clear
+        caret.foregroundColor = visible ? Theme.accent : .clear
         return caret
     }
 }

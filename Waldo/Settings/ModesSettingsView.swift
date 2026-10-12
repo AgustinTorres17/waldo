@@ -7,14 +7,14 @@ struct ModesSettingsView: View {
     @State private var editingID: UUID?
 
     var body: some View {
-        SettingsPage(title: "Modes") {
-            SettingsCaption("A mode tells Waldo how you want to sound: more formal, casual, for work, for a friend. It applies to Translate / Correct, Rephrase and the hotkeys. The default mode is used everywhere, except in apps that have their own.")
-
-            SettingsSection(title: "Your modes") {
+        SettingsPage(title: "Modes",
+                     subtitle: "How you want to sound: formal, casual, for work, for a friend. A mode applies to Translate / Correct, Rephrase and the hotkeys.") {
+            SettingsSection(title: "Your modes",
+                            footer: "The default mode is used everywhere, except in apps that have their own.") {
                 VStack(spacing: 0) {
                     ForEach(settings.customModes) { mode in
                         modeRow(mode)
-                        Rectangle().fill(Theme.divider).frame(height: 1)
+                        SettingsDivider()
                     }
                     HStack {
                         Button(action: addMode) {
@@ -24,10 +24,10 @@ struct ModesSettingsView: View {
                             }
                         }
                         .buttonStyle(.monoGhost)
-                        .padding(.leading, -10)
+                        .padding(.leading, -9)
                         Spacer()
                     }
-                    .padding(.top, 6)
+                    .padding(.vertical, 6)
                 }
             }
 
@@ -36,9 +36,8 @@ struct ModesSettingsView: View {
                     .id(editingID)
             }
 
-            SettingsSection(title: "Per app") {
-                SettingsCaption("These apps use their own mode and language instead of the defaults. Changing them in the popup changes them for that app.")
-                    .padding(.vertical, 10)
+            SettingsSection(title: "Per app",
+                            footer: "These apps use their own mode and language instead of the defaults. Changing them in the popup changes them for that app.") {
                 VStack(spacing: 0) {
                     ForEach(settings.appModeRules) { rule in
                         HStack {
@@ -62,7 +61,8 @@ struct ModesSettingsView: View {
                             .buttonStyle(.icon)
                             .help("Use the defaults")
                         }
-                        .padding(.vertical, 5)
+                        .padding(.vertical, 6)
+                        SettingsDivider()
                     }
                     HStack {
                         Button(action: addApps) {
@@ -72,10 +72,10 @@ struct ModesSettingsView: View {
                             }
                         }
                         .buttonStyle(.monoGhost)
-                        .padding(.leading, -10)
+                        .padding(.leading, -9)
                         Spacer()
                     }
-                    .padding(.top, 2)
+                    .padding(.vertical, 6)
                 }
             }
             .disabled(settings.customModes.isEmpty)
@@ -91,13 +91,14 @@ struct ModesSettingsView: View {
         return HStack(spacing: 8) {
             Button { editingID = mode.id } label: {
                 HStack(spacing: 6) {
+                    Circle()
+                        .fill(isEditing ? Theme.accent : Theme.border)
+                        .frame(width: 6, height: 6)
                     Text(mode.name.isEmpty ? "Untitled" : mode.name)
-                        .font(.system(size: 13, weight: isEditing ? .medium : .regular))
+                        .font(.system(size: 13, weight: isEditing ? .semibold : .regular))
                         .foregroundStyle(Theme.text)
-                    if isEditing {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Theme.tertiaryText)
+                    if isActive {
+                        Badge("Default", prominent: true)
                     }
                     Spacer(minLength: 0)
                 }
@@ -106,9 +107,6 @@ struct ModesSettingsView: View {
             .buttonStyle(.plain)
 
             if isActive {
-                Text("Default")
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(Theme.secondaryText)
                 Button("Turn off") { settings.activeModeID = nil }
                     .buttonStyle(.monoGhost)
             } else {
@@ -123,7 +121,7 @@ struct ModesSettingsView: View {
             .buttonStyle(.icon)
             .help("Delete")
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 6)
     }
 
     /// Edits one field of an app's rule; nil means the default.
@@ -162,7 +160,7 @@ private struct ModeEditor: View {
     @Binding var mode: CustomMode
 
     var body: some View {
-        SettingsSection(title: "Edit mode") {
+        SettingsSection(title: mode.name.isEmpty ? "Edit mode" : "Edit “\(mode.name)”") {
             VStack(alignment: .leading, spacing: 14) {
                 field("Name") {
                     TextField("", text: limited(\.name, to: CustomMode.maxNameLength))
@@ -171,7 +169,7 @@ private struct ModeEditor: View {
                         .foregroundStyle(Theme.text)
                         .padding(.horizontal, 8)
                         .frame(height: 28)
-                        .boxed()
+                        .fieldBox()
                 }
                 textArea("Guidelines",
                          hint: "How Waldo should write: tone, formality, length, words to use or avoid.",
@@ -183,7 +181,7 @@ private struct ModeEditor: View {
                          hint: "Messages that sound wrong to you. Waldo avoids their style.",
                          text: \.dislikedExamples, height: 80)
             }
-            .padding(.top, 12)
+            .padding(.vertical, 14)
         }
     }
 
@@ -206,7 +204,7 @@ private struct ModeEditor: View {
                     .scrollContentBackground(.hidden)
                     .padding(6)
                     .frame(height: height)
-                    .boxed()
+                    .fieldBox()
                 HStack(alignment: .top) {
                     SettingsCaption(hint)
                     Spacer(minLength: 12)
@@ -224,12 +222,5 @@ private struct ModeEditor: View {
             get: { mode[keyPath: keyPath] },
             set: { mode[keyPath: keyPath] = String($0.prefix(limit)) }
         )
-    }
-}
-
-private extension View {
-    func boxed() -> some View {
-        background(Theme.background, in: RoundedRectangle(cornerRadius: Theme.radius))
-            .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.border))
     }
 }

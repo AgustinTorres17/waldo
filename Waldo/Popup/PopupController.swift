@@ -85,8 +85,20 @@ final class PopupController {
         let size = fittingSize()
         placement = PopupPositioner.placement(for: size, anchor: anchor)
         panel.setFrame(PopupPositioner.frame(for: size, anchor: anchor, placement: placement), display: true)
-        panel.orderFrontRegardless()
+        fadeIn(panel)
         installVisibleOnlyMonitors()
+    }
+
+    /// A quick fade when the panel appears; changes while it's up aren't animated.
+    private func fadeIn(_ panel: PopupPanel) {
+        guard !panel.isVisible else { return }
+        panel.alphaValue = 0
+        panel.orderFrontRegardless()
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.14
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().alphaValue = 1
+        }
     }
 
     /// A short message next to `anchor` that closes by itself.
@@ -199,7 +211,7 @@ final class PopupController {
         isSuspended = false
         resumedAt = .now
         relayout(force: true)
-        panel.orderFrontRegardless()
+        fadeIn(panel)
         installVisibleOnlyMonitors()
     }
 

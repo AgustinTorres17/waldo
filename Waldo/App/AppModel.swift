@@ -9,6 +9,7 @@ final class AppModel: ObservableObject {
     let state = AppState()
     let permission = AccessibilityPermission()
     let models = ModelDownloader()
+    let launchAtLogin = LaunchAtLogin()
     private lazy var engineSelector = EngineSelector(settings: settings)
     private let processor = TextProcessor()
     private var hotkeys: HotkeyManager?
@@ -37,7 +38,7 @@ final class AppModel: ObservableObject {
     }
 
     private let settingsWindow = HostedWindowController(title: "Waldo Settings", fullSizeContent: true)
-    private let onboardingWindow = HostedWindowController(title: "Welcome to Waldo")
+    private let onboardingWindow = HostedWindowController(title: "Welcome to Waldo", fullSizeContent: true)
     private var cancellables: Set<AnyCancellable> = []
     private var prewarmTask: Task<Void, Never>?
 
@@ -79,8 +80,10 @@ final class AppModel: ObservableObject {
     }
 
     func showOnboarding() {
-        onboardingWindow.show { [onboardingWindow, permission] in
-            OnboardingView(permission: permission) { onboardingWindow.close() }
+        onboardingWindow.show { [onboardingWindow, permission, settings, launchAtLogin] in
+            OnboardingView(permission: permission, settings: settings, launchAtLogin: launchAtLogin) {
+                onboardingWindow.close()
+            }
         }
     }
 

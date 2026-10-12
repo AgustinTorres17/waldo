@@ -7,7 +7,7 @@ struct EngineSettingsView: View {
     private static let idleChoices = [30, 60, 120, 300, 600, 1_800]
 
     var body: some View {
-        SettingsPage(title: "Engine") {
+        SettingsPage(title: "Engine", subtitle: "The model that runs on this Mac. Your text never leaves it.") {
             SettingsSection(title: "Inference") {
                 SettingsRow(title: "Engine", detail: settings.engineMode.detail) {
                     MonoMenuPicker(selection: $settings.engineMode, options: EngineMode.allCases) { $0.title }
@@ -17,7 +17,7 @@ struct EngineSettingsView: View {
             SettingsSection(title: "llama.cpp models") {
                 ForEach(Array(ModelCatalog.all.enumerated()), id: \.element.id) { index, model in
                     if index > 0 {
-                        Rectangle().fill(Theme.divider).frame(height: 1)
+                        SettingsDivider()
                     }
                     ModelRow(model: model, state: models.state(of: model),
                              isChosen: settings.llamaModelID == model.id,
@@ -60,9 +60,14 @@ private struct ModelRow: View {
         HStack(alignment: .top, spacing: 12) {
             Button(action: choose) {
                 ZStack {
-                    Circle().strokeBorder(isChosen ? Theme.solid : Theme.border, lineWidth: isChosen ? 5 : 1.5)
+                    Circle().fill(Theme.control)
+                    Circle().strokeBorder(Theme.border, lineWidth: 1)
+                    if isChosen {
+                        Circle().fill(Theme.accentFill)
+                        Circle().fill(Theme.onAccent).frame(width: 6, height: 6)
+                    }
                 }
-                .frame(width: 15, height: 15)
+                .frame(width: 16, height: 16)
                 .contentShape(Circle())
             }
             .buttonStyle(.plain)
@@ -74,12 +79,7 @@ private struct ModelRow: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Theme.text)
                     if isRecommended {
-                        Text("Recommended")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.secondaryText)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Theme.hover, in: RoundedRectangle(cornerRadius: 4))
+                        Badge("Recommended", prominent: true)
                     }
                 }
                 SettingsCaption("\(model.summary) \(model.formattedSize).")
@@ -98,11 +98,12 @@ private struct ModelRow: View {
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Theme.divider)
-                        Capsule().fill(Theme.solid).frame(width: proxy.size.width * fraction)
+                        Capsule().fill(Theme.accentFill).frame(width: proxy.size.width * fraction)
                     }
                 }
-                .frame(height: 3)
+                .frame(height: 4)
                 Text("Downloading… \(Int(fraction * 100))%")
+                    .monospacedDigit()
                     .font(.system(size: 11.5))
                     .foregroundStyle(Theme.secondaryText)
             }

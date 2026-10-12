@@ -17,6 +17,7 @@ final class SettingsStore: ObservableObject {
         static let appModeRules = "appModeRules"
         static let showChanges = "showChanges"
         static let glossary = "glossary"
+        static let appTheme = "appTheme"
     }
 
     private let defaults: UserDefaults
@@ -62,6 +63,14 @@ final class SettingsStore: ObservableObject {
     /// Highlight what a correction changed in the popup's result.
     @Published var showChanges: Bool {
         didSet { defaults.set(showChanges, forKey: Key.showChanges) }
+    }
+
+    /// The look of Waldo's windows and popup.
+    @Published var appTheme: AppTheme {
+        didSet {
+            Theme.current = appTheme
+            defaults.set(appTheme.rawValue, forKey: Key.appTheme)
+        }
     }
 
     /// Terms Waldo never changes, one per line (see Glossary).
@@ -147,6 +156,9 @@ final class SettingsStore: ObservableObject {
         accessibleBrowserBundleIDs = defaults.stringArray(forKey: Key.accessibleBrowserBundleIDs) ?? []
         showChanges = defaults.object(forKey: Key.showChanges) as? Bool ?? true
         glossaryText = defaults.string(forKey: Key.glossary) ?? ""
+        let theme = defaults.string(forKey: Key.appTheme).flatMap(AppTheme.init) ?? .glass
+        appTheme = theme
+        Theme.current = theme
         appModeRules = defaults.data(forKey: Key.appModeRules)
             .flatMap { try? JSONDecoder().decode([AppRule].self, from: $0) } ?? []
         // Starter modes on first launch only, so deleting them sticks.

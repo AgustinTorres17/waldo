@@ -12,10 +12,9 @@ struct TryItSettingsView: View {
     @State private var isRunning = false
 
     var body: some View {
-        SettingsPage(title: "Try It") {
+        SettingsPage(title: "Try It",
+                     subtitle: "Run Waldo on any text, without hotkeys or the clipboard. Into \(settings.targetLanguage.displayName).") {
             VStack(alignment: .leading, spacing: 14) {
-                SettingsCaption("Run Waldo on any text without hotkeys or the clipboard. Target: \(settings.targetLanguage.displayName).")
-
                 fieldLabel("Text")
                 TextEditor(text: $input)
                     .font(.system(size: 13))
@@ -23,7 +22,7 @@ struct TryItSettingsView: View {
                     .scrollContentBackground(.hidden)
                     .padding(8)
                     .frame(height: 110)
-                    .boxed()
+                    .fieldBox()
 
                 HStack(spacing: 10) {
                     Button("Process") { run(.automatic) }
@@ -34,9 +33,10 @@ struct TryItSettingsView: View {
                         .buttonStyle(.monoSecondary)
                         .keyboardShortcut(.return, modifiers: [.command, .shift])
                         .disabled(isRunning || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Text("⌘↩ · ⇧⌘↩")
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(Theme.tertiaryText)
+                    HStack(spacing: 4) {
+                        KeyCap("⌘↩")
+                        KeyCap("⇧⌘↩")
+                    }
                     Spacer()
                     if isRunning { ProgressView().controlSize(.small).scaleEffect(0.8) }
                 }
@@ -52,7 +52,7 @@ struct TryItSettingsView: View {
                         .padding(12)
                 }
                 .frame(height: 110)
-                .boxed()
+                .fieldBox()
 
                 if !status.isEmpty {
                     Text(status)
@@ -96,9 +96,4 @@ struct TryItSettingsView: View {
     }
 }
 
-private extension View {
-    func boxed() -> some View {
-        background(Theme.background, in: RoundedRectangle(cornerRadius: Theme.radius))
-            .overlay(RoundedRectangle(cornerRadius: Theme.radius).strokeBorder(Theme.border))
-    }
-}
+

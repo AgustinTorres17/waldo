@@ -6,13 +6,13 @@ struct PopupSettingsView: View {
     @ObservedObject var settings: SettingsStore
 
     var body: some View {
-        SettingsPage(title: "Popup") {
+        SettingsPage(title: "Popup", subtitle: "The bar that appears when you select text.") {
             SettingsSection(title: "Behavior") {
                 SettingsRow(title: "Show popup on selection",
                             detail: "Appears when you select text in an editable field.") {
                     Toggle(isOn: $settings.popupEnabled) { EmptyView() }.toggleStyle(.mono)
                 }
-                Rectangle().fill(Theme.divider).frame(height: 1)
+                SettingsDivider()
                 SettingsRow(title: "Keyboard selections",
                             detail: "Also show it after Shift+arrows or ⌘A.") {
                     Toggle(isOn: $settings.keyboardSelectionEnabled) { EmptyView() }.toggleStyle(.mono)
@@ -20,9 +20,8 @@ struct PopupSettingsView: View {
                 .disabled(!settings.popupEnabled)
             }
 
-            SettingsSection(title: "Excluded apps") {
-                SettingsCaption("The popup never appears in these apps. The hotkeys still work.")
-                    .padding(.vertical, 10)
+            SettingsSection(title: "Excluded apps",
+                            footer: "The popup never appears in these apps. The hotkeys still work.") {
                 VStack(spacing: 0) {
                     ForEach(settings.excludedBundleIDs, id: \.self) { bundleID in
                         HStack {
@@ -36,7 +35,8 @@ struct PopupSettingsView: View {
                             .buttonStyle(.icon)
                             .help("Remove")
                         }
-                        .padding(.vertical, 5)
+                        .padding(.vertical, 6)
+                        SettingsDivider()
                     }
                     HStack {
                         Button(action: addApp) {
@@ -46,27 +46,33 @@ struct PopupSettingsView: View {
                             }
                         }
                         .buttonStyle(.monoGhost)
-                        .padding(.leading, -10)
+                        .padding(.leading, -9)
                         Spacer()
                     }
-                    .padding(.top, 2)
+                    .padding(.vertical, 6)
                 }
             }
             .disabled(!settings.popupEnabled)
 
-            SettingsSection(title: "Browsers") {
-                let browsers = ChromiumBrowsers.installedBundleIDs
-                SettingsCaption(browsers.isEmpty
-                    ? "Chrome, Brave and other Chromium browsers don't report selections unless Waldo turns on their full accessibility support. None is installed."
-                    : "Chromium browsers only report selections when Waldo turns on their full accessibility support. This can make window moves and animations slower in that browser. The hotkeys work either way.")
-                    .padding(.vertical, 10)
+            let browsers = ChromiumBrowsers.installedBundleIDs
+            SettingsSection(title: "Browsers",
+                            footer: browsers.isEmpty
+                                ? "Chrome, Brave and other Chromium browsers don't report selections unless Waldo turns on their full accessibility support. None is installed."
+                                : "Chromium browsers only report selections when Waldo turns on their full accessibility support. This can make window moves and animations slower in that browser. The hotkeys work either way.") {
+                if browsers.isEmpty {
+                    Text("No Chromium browsers installed.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(Theme.tertiaryText)
+                        .padding(.vertical, 11)
+                }
                 ForEach(browsers, id: \.self) { bundleID in
                     HStack {
                         AppRow(bundleID: bundleID)
                         Spacer()
                         Toggle(isOn: browserBinding(bundleID)) { EmptyView() }.toggleStyle(.mono)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 7)
+                    if bundleID != browsers.last { SettingsDivider() }
                 }
             }
             .disabled(!settings.popupEnabled)
@@ -109,7 +115,8 @@ struct AppRow: View {
             if let url {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                     .resizable()
-                    .frame(width: 16, height: 16)
+                    .interpolation(.high)
+                    .frame(width: 20, height: 20)
             }
             Text(url.map { FileManager.default.displayName(atPath: $0.path) } ?? bundleID)
                 .font(.system(size: 13))
