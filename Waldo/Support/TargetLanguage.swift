@@ -55,4 +55,16 @@ enum TargetLanguage: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 
     var locale: Locale { Locale(identifier: rawValue) }
+
+    /// The first of the Mac's preferred languages that Waldo offers.
+    static var preferred: TargetLanguage? {
+        for identifier in Locale.preferredLanguages {
+            let code = identifier.lowercased()
+            if code.hasPrefix("zh-hans") { return .chineseSimplified }
+            if let match = allCases.first(where: { $0 != .chineseSimplified && code.hasPrefix(String($0.rawValue.prefix(2)).lowercased()) }) {
+                return match
+            }
+        }
+        return nil
+    }
 }

@@ -22,6 +22,10 @@ struct MenuContent: View {
             }
         }
         Divider()
+        Button("Open Waldo") { model.showMainWindow() }
+        Button("New Chat") { model.startChat() }
+        Button("Explain Screen Region…") { model.startExplain() }
+        Button("Explain Whole Screen") { model.startExplain(wholeScreen: true) }
         Button("Undo Last Replacement") { Task { await model.undoLastReplacement() } }
             .disabled(!state.canUndoReplacement)
         Toggle("Show Popup on Selection", isOn: $settings.popupEnabled)

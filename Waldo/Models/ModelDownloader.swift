@@ -33,7 +33,7 @@ final class ModelDownloader: ObservableObject {
     }
 
     func refresh() {
-        for model in ModelCatalog.all where !isActive(states[model.id]) {
+        for model in ModelCatalog.all + ModelCatalog.projectors where !isActive(states[model.id]) {
             states[model.id] = ModelCatalog.isInstalled(model) ? .installed : .notInstalled
         }
     }

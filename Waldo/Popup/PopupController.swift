@@ -42,6 +42,7 @@ final class PopupController {
     init(app: AppModel) {
         self.app = app
         model.onProcess = { [weak self] mode in self?.process(mode) }
+        model.onAsk = { [weak self] in self?.askAboutSelection() }
         model.onReplace = { [weak self] text in self?.replace(text) }
         model.onCopy = { [weak self] text in
             ClipboardService.writeString(text)
@@ -252,6 +253,13 @@ final class PopupController {
                 self?.model.state = .error(error.localizedDescription)
             }
         }
+    }
+
+    /// Opens a chat about the selection in Waldo's window.
+    private func askAboutSelection() {
+        guard let snapshot else { return }
+        hide(reason: "ask")
+        app.startChat(about: snapshot.text)
     }
 
     private func showPartial(_ text: String, requestID id: Int) {

@@ -7,7 +7,7 @@ struct EngineSettingsView: View {
     private static let idleChoices = [30, 60, 120, 300, 600, 1_800]
 
     var body: some View {
-        SettingsPage(title: "Engine", subtitle: "The model that runs on this Mac. Your text never leaves it.") {
+        SettingsPage(title: "Engine", subtitle: "The model that runs on this Mac. Your text never leaves it, except the web searches you turn on in Explain.") {
             SettingsSection(title: "Inference") {
                 SettingsRow(title: "Engine", detail: settings.engineMode.detail) {
                     MonoMenuPicker(selection: $settings.engineMode, options: EngineMode.allCases) { $0.title }
@@ -27,6 +27,23 @@ struct EngineSettingsView: View {
                              download: { models.download(model) },
                              cancel: models.cancel,
                              delete: { models.delete(model) })
+                }
+            }
+
+            SettingsSection(title: "Vision add-ons",
+                            footer: "Explain uses the chosen model plus its vision add-on to read what you capture on screen.") {
+                ForEach(Array(ModelCatalog.projectors.enumerated()), id: \.element.id) { index, projector in
+                    if index > 0 {
+                        SettingsDivider()
+                    }
+                    ModelRow(model: projector, state: models.state(of: projector),
+                             isChosen: false,
+                             isRecommended: ModelCatalog.vision(for: ModelCatalog.recommended) == projector,
+                             downloadDisabled: models.isBusy,
+                             choose: nil,
+                             download: { models.download(projector) },
+                             cancel: models.cancel,
+                             delete: { models.delete(projector) })
                 }
             }
 
@@ -51,28 +68,17 @@ private struct ModelRow: View {
     let isChosen: Bool
     let isRecommended: Bool
     let downloadDisabled: Bool
-    let choose: () -> Void
+    /// Nil for files that aren't chosen on their own (vision add-ons).
+    let choose: (() -> Void)?
     let download: () -> Void
     let cancel: () -> Void
     let delete: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Button(action: choose) {
-                ZStack {
-                    Circle().fill(Theme.control)
-                    Circle().strokeBorder(Theme.border, lineWidth: 1)
-                    if isChosen {
-                        Circle().fill(Theme.accentFill)
-                        Circle().fill(Theme.onAccent).frame(width: 6, height: 6)
-                    }
-                }
-                .frame(width: 16, height: 16)
-                .contentShape(Circle())
+            if let choose {
+                chooseButton(choose)
             }
-            .buttonStyle(.plain)
-            .padding(.top, 1)
-            .accessibilityLabel(isChosen ? "Chosen" : "Choose \(model.name)")
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(model.name)
@@ -89,6 +95,24 @@ private struct ModelRow: View {
             actions
         }
         .padding(.vertical, 12)
+    }
+
+    private func chooseButton(_ choose: @escaping () -> Void) -> some View {
+        Button(action: choose) {
+            ZStack {
+                Circle().fill(Theme.control)
+                Circle().strokeBorder(Theme.border, lineWidth: 1)
+                if isChosen {
+                    Circle().fill(Theme.accentFill)
+                    Circle().fill(Theme.onAccent).frame(width: 6, height: 6)
+                }
+            }
+            .frame(width: 16, height: 16)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 1)
+        .accessibilityLabel(isChosen ? "Chosen" : "Choose \(model.name)")
     }
 
     @ViewBuilder private var status: some View {

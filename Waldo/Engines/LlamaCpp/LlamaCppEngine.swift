@@ -12,8 +12,14 @@ actor LlamaCppEngine: InferenceEngine {
     private static let contextStep = 512
     private static let maxContext = 4_096
     private static let seed: UInt32 = 42
+    /// Chat answers in detail; this is a long one (~50 s at 20 tokens/s).
+    private static let maxChatOutput = 1_024
+    /// Thinking writes its reasoning first, often longer than the answer.
+    private static let maxThinkingOutput = 4_096
 
     private var model: ModelInfo?
+    /// The model's vision projector, for captures in chats.
+    private var vision: ModelInfo?
     private var idleUnloadSeconds = 120
     private var loaded: LoadedModel?
     private var unloadTask: Task<Void, Never>?
@@ -26,6 +32,7 @@ actor LlamaCppEngine: InferenceEngine {
     /// The model to use (nil: none installed) and how long it may stay loaded unused.
     func configure(model: ModelInfo?, idleUnloadSeconds: Int) {
         self.idleUnloadSeconds = idleUnloadSeconds
+        vision = model.flatMap(ModelCatalog.vision(for:))
         guard model != self.model else { return }
         self.model = model
         unload()
@@ -69,6 +76,37 @@ actor LlamaCppEngine: InferenceEngine {
                                          onPartial: onPartial)
         log.info("Generated \(output.tokenCount, privacy: .public) tokens from \(plan.suffix.count, privacy: .public)+\(plan.prefix.count, privacy: .public)\(output.prefixCached ? " (cached)" : "", privacy: .public) in \(ContinuousClock.now - start, privacy: .public)")
         return output.text
+    }
+
+    // MARK: Chat
+
+    /// Chat needs a downloaded model, whatever engine handles text; images also
+    /// need its vision add-on.
+    func chatAvailability(needsVision: Bool) -> EngineAvailability {
+        if case .unavailable(let reason) = availability() { return .unavailable(reason) }
+        if needsVision, !(vision.map(ModelCatalog.isInstalled) ?? false) {
+            return .unavailable("Reading captures needs \(model?.name ?? "the model")'s vision add-on. Download it in Settings › Engine.")
+        }
+        return .available
+    }
+
+    /// Writes the next step of the last turn of `conversation`.
+    func chat(_ conversation: ChatConversation, instructions: String, onPartial: PartialHandler?) throws -> String {
+        let needsVision = conversation.turns.contains(where: \.hasImage)
+        if case .unavailable(let reason) = chatAvailability(needsVision: needsVision) { throw ChatError.noVisionModel(reason) }
+        defer { scheduleUnload() }
+        let loaded = try loadIfNeeded()
+        let start = ContinuousClock.now
+        let thinks = conversation.turns.last?.thinks == true
+        let output = try loaded.chat(conversation, projector: needsVision ? vision : nil, instructions: instructions,
+                                     maxOutput: thinks ? Self.maxThinkingOutput : Self.maxChatOutput, onPartial: onPartial)
+        log.info("Chat turn \(conversation.turns.count, privacy: .public): \(output.tokenCount, privacy: .public) tokens in \(ContinuousClock.now - start, privacy: .public)")
+        return output.text
+    }
+
+    /// Frees the chat's memory when its panel closes.
+    func endChat(_ id: UUID) {
+        loaded?.endChat(id)
     }
 
     private struct Plan {
@@ -130,10 +168,13 @@ actor LlamaCppEngine: InferenceEngine {
 /// reduced to errors, routed to the unified log.
 private enum LlamaBackend {
     private static let once: Void = {
-        llama_log_set({ level, text, _ in
+        let logErrors: ggml_log_callback = { level, text, _ in
             guard level == GGML_LOG_LEVEL_ERROR, let text else { return }
             llamaLog.error("\(String(cString: text), privacy: .public)")
-        }, nil)
+        }
+        llama_log_set(logErrors, nil)
+        mtmd_log_set(logErrors, nil)
+        mtmd_helper_log_set(logErrors, nil)
         llama_backend_init()
     }()
 
@@ -145,10 +186,13 @@ private enum LlamaBackend {
 private let llamaLog = Logger(subsystem: "com.agustintorres.waldo", category: "llama")
 
 /// A loaded model plus its context. Not thread-safe: owned by LlamaCppEngine.
-private final class LoadedModel {
+final class LoadedModel {
     let info: ModelInfo
-    private let model: OpaquePointer
-    private let vocab: OpaquePointer
+    let model: OpaquePointer
+    let vocab: OpaquePointer
+    /// Loaded for the first chat with a capture (LlamaCppEngine+Chat.swift).
+    var projector: VisionProjector?
+    var chatSession: ChatSession?
     private var context: OpaquePointer?
     private var contextSize = 0
     /// Evaluated prefix states (system prompt + examples), most recent last.
@@ -167,6 +211,8 @@ private final class LoadedModel {
     }
 
     deinit {
+        chatSession = nil // both reference the model
+        projector = nil
         if let context { llama_free(context) }
         llama_model_free(model)
     }
@@ -301,7 +347,7 @@ private final class LoadedModel {
         return chain
     }
 
-    private static let performanceCores: Int32 = {
+    static let performanceCores: Int32 = {
         var cores: Int32 = 0
         var size = MemoryLayout<Int32>.size
         if sysctlbyname("hw.perflevel0.physicalcpu", &cores, &size, nil, 0) == 0, cores > 0 { return cores }

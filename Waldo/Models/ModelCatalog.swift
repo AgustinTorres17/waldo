@@ -20,9 +20,14 @@ struct ModelInfo: Identifiable, Sendable, Equatable {
     let family: PromptFamily
     /// Physical memory below which this model isn't recommended.
     let minimumMemoryGB: Int
+    /// The vision projector (mmproj) that lets this model read captures in chats.
+    var visionID: String? = nil
+    /// The name on Hugging Face when it differs from `fileName` (every repo's
+    /// projector is "mmproj-F16.gguf", so the local copy gets the model's name).
+    var remoteFileName: String? = nil
 
     var downloadURL: URL {
-        URL(string: "https://huggingface.co/\(repo)/resolve/\(revision)/\(fileName)")!
+        URL(string: "https://huggingface.co/\(repo)/resolve/\(revision)/\(remoteFileName ?? fileName)")!
     }
 
     var formattedSize: String {
@@ -41,7 +46,8 @@ enum ModelCatalog {
         sizeBytes: 2_740_937_888,
         sha256: "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
         family: .qwen35,
-        minimumMemoryGB: 16
+        minimumMemoryGB: 16,
+        visionID: "qwen3.5-4b-mmproj-f16"
     )
 
     static let qwen35_2B = ModelInfo(
@@ -54,13 +60,49 @@ enum ModelCatalog {
         sizeBytes: 1_435_238_656,
         sha256: "1885b3a9195f8cc09da9a7a7a75afdc1e8d5cbf9fc4a499c3961dddea37098ac",
         family: .qwen35,
-        minimumMemoryGB: 8
+        minimumMemoryGB: 8,
+        visionID: "qwen3.5-2b-mmproj-f16"
     )
 
     static let all = [qwen35_4B, qwen35_2B]
 
+    static let qwen35_4BVision = ModelInfo(
+        id: "qwen3.5-4b-mmproj-f16",
+        name: "Qwen3.5 4B Vision",
+        summary: "Lets Qwen3.5 4B read the captures you add to chats.",
+        repo: "unsloth/Qwen3.5-4B-GGUF",
+        revision: "e87f176479d0855a907a41277aca2f8ee7a09523",
+        fileName: "Qwen3.5-4B-mmproj-F16.gguf",
+        sizeBytes: 672_423_616,
+        sha256: "cd88edcf8d031894960bb0c9c5b9b7e1fea6ebee02b9f7ce925a00d12891f864",
+        family: .qwen35,
+        minimumMemoryGB: 16,
+        remoteFileName: "mmproj-F16.gguf"
+    )
+
+    static let qwen35_2BVision = ModelInfo(
+        id: "qwen3.5-2b-mmproj-f16",
+        name: "Qwen3.5 2B Vision",
+        summary: "Lets Qwen3.5 2B read the captures you add to chats.",
+        repo: "unsloth/Qwen3.5-2B-GGUF",
+        revision: "f6d5376be1edb4d416d56da11e5397a961aca8ae",
+        fileName: "Qwen3.5-2B-mmproj-F16.gguf",
+        sizeBytes: 668_227_264,
+        sha256: "7035e9cb8d7c6a9681d07eef9a364783e86ea4cd73faab2eabb4f43a101830c7",
+        family: .qwen35,
+        minimumMemoryGB: 8,
+        remoteFileName: "mmproj-F16.gguf"
+    )
+
+    /// Vision projectors: downloaded on their own, used with their model.
+    static let projectors = [qwen35_4BVision, qwen35_2BVision]
+
     static func model(id: String) -> ModelInfo? {
         all.first { $0.id == id }
+    }
+
+    static func vision(for model: ModelInfo) -> ModelInfo? {
+        projectors.first { $0.id == model.visionID }
     }
 
     /// The best model this Mac has enough memory for.

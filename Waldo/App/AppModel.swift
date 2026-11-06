@@ -14,6 +14,10 @@ final class AppModel: ObservableObject {
     private let processor = TextProcessor()
     private var hotkeys: HotkeyManager?
     private lazy var popup = PopupController(app: self)
+    private(set) lazy var library = ChatLibrary(app: self)
+    /// What Waldo's window shows: the chats, or a Settings pane.
+    let route = WindowRoute()
+    private lazy var mainWindow = MainWindowController(app: self)
     private lazy var selectionMonitor = SelectionMonitor(app: self, popup: popup)
     private(set) lazy var replacementUndo = ReplacementUndo(state: state) { [weak self] in
         self?.isAutomatingInput ?? false
@@ -37,16 +41,19 @@ final class AppModel: ObservableObject {
         automationQuietUntil = .now + .milliseconds(400)
     }
 
-    private let settingsWindow = HostedWindowController(title: "Waldo Settings", fullSizeContent: true)
     private let onboardingWindow = HostedWindowController(title: "Welcome to Waldo", fullSizeContent: true)
     private var cancellables: Set<AnyCancellable> = []
     private var prewarmTask: Task<Void, Never>?
 
     func launch() {
         AXElement.configureTimeout()
-        hotkeys = HotkeyManager(flow: HotkeyFlow(model: self)) { [weak self] in
+        hotkeys = HotkeyManager(flow: HotkeyFlow(model: self), undo: { [weak self] in
             Task { await self?.undoLastReplacement() }
-        }
+        }, explain: { [weak self] wholeScreen in
+            self?.startExplain(wholeScreen: wholeScreen)
+        }, newChat: { [weak self] in
+            self?.startChat()
+        })
 
         // Event-driven: refresh the menu's engine line when the mode changes (and once now).
         settings.$engineMode.map { _ in () }
@@ -75,8 +82,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func openSettings() {
-        settingsWindow.show { SettingsView(model: self, settings: settings, permission: permission, models: models) }
+    /// Settings take the place of the chats in Waldo's window.
+    func openSettings(_ pane: SettingsPane? = nil) {
+        route.settingsPane = pane ?? route.settingsPane ?? .general
+        mainWindow.show()
     }
 
     func showOnboarding() {
@@ -147,6 +156,97 @@ final class AppModel: ObservableObject {
 
     func endHotkeyProgress(error: String? = nil, note: String? = nil) {
         popup.endHotkeyRun(error: error, note: note)
+    }
+
+    // MARK: Chat
+
+    func showMainWindow() {
+        mainWindow.show()
+    }
+
+    /// The app the user is in, unless it's Waldo itself.
+    private var frontmostAppName: String? {
+        let app = NSWorkspace.shared.frontmostApplication
+        return app?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : app?.localizedName
+    }
+
+    /// A new chat in Waldo's window.
+    func startChat() {
+        popup.hide(reason: "chat")
+        route.settingsPane = nil
+        library.startNewChat(openedFrom: frontmostAppName)
+        mainWindow.show()
+    }
+
+    /// A new chat that starts with a capture: a dragged region or the whole screen.
+    func startExplain(wholeScreen: Bool = false) {
+        popup.hide(reason: "explain")
+        let openedFrom = frontmostAppName
+        Task {
+            guard let image = await library.capture(wholeScreen: wholeScreen, hiding: mainWindow.window) else { return }
+            route.settingsPane = nil
+            library.startNewChat(openedFrom: openedFrom, image: image)
+            mainWindow.show()
+        }
+    }
+
+    /// A new chat about text selected in another app (the popup's Ask).
+    func startChat(about text: String) {
+        route.settingsPane = nil
+        library.startNewChat(openedFrom: frontmostAppName, quote: text)
+        mainWindow.show()
+    }
+
+    /// A capture for the next message of the chat on screen.
+    func addCapture(wholeScreen: Bool) {
+        Task {
+            guard let image = await library.capture(wholeScreen: wholeScreen, hiding: mainWindow.window) else { return }
+            library.pendingImage = image
+            mainWindow.show()
+        }
+    }
+
+    /// Why chatting (with captures, if `needsVision`) can't run now, or nil.
+    func chatUnavailableReason(needsVision: Bool) async -> String? {
+        await engineSelector.chatEngine(needsVision: needsVision).reason
+    }
+
+    func chat(_ conversation: ChatConversation, onPartial: PartialHandler?) async throws -> String {
+        let needsVision = conversation.turns.contains(where: \.hasImage)
+        guard let engine = await engineSelector.chatEngine(needsVision: needsVision).engine else {
+            throw ChatError.noVisionModel(await chatUnavailableReason(needsVision: needsVision) ?? "Chat is unavailable.")
+        }
+        state.isProcessing = true
+        defer { state.isProcessing = false }
+        return try await engine.chat(conversation, instructions: ChatPrompts.instructions(language: settings.chatLanguage,
+                                                                                conversation: conversation),
+                                     onPartial: onPartial)
+    }
+
+    /// A few words naming the chat, written by the model; nil if it can't.
+    func chatTitle(for chat: ChatConversation) async -> String? {
+        guard let first = chat.turns.first,
+              let engine = await engineSelector.chatEngine(needsVision: false).engine else { return nil }
+        let request = GenerationRequest(instructions: ChatPrompts.titleInstructions(language: settings.chatLanguage),
+                                        prompt: ChatPrompts.titlePrompt(for: first), maxOutputTokens: 32, greedy: true)
+        guard let raw = try? await engine.generate(request) else { return nil }
+        let line = raw.split(separator: "\n").first.map(String.init) ?? ""
+        let title = line.trimmingCharacters(in: CharacterSet(charactersIn: " \"'“”*.#").union(.whitespaces))
+        return title.isEmpty ? nil : String(title.prefix(60))
+    }
+
+    /// Only the query leaves the Mac.
+    func webSearch(_ query: String) async throws -> [SearchResult] {
+        try await WebSearch.search(query, provider: settings.searchProvider, searXNGURL: settings.searXNGURL)
+    }
+
+    func endChat(_ id: UUID) {
+        Task { [engineSelector] in await engineSelector.chatEngine(needsVision: false).engine?.endChat(id) }
+    }
+
+    /// A short message next to `anchor` that closes by itself.
+    func flash(note: String, anchor: CGRect, isError: Bool = false) {
+        popup.flash(note: note, anchor: anchor, isError: isError)
     }
 
     func discardPrewarm() {

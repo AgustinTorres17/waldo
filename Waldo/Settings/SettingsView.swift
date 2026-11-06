@@ -1,96 +1,101 @@
 import KeyboardShortcuts
 import SwiftUI
 
-struct SettingsView: View {
+/// A section of Settings. Settings shows in Waldo's window in place of the chats.
+enum SettingsPane: String, CaseIterable, Identifiable {
+    case general, modes, glossary, popup, hotkeys, engine, tryIt
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .modes: "Modes"
+        case .glossary: "Glossary"
+        case .popup: "Popup"
+        case .hotkeys: "Hotkeys"
+        case .engine: "Engine"
+        case .tryIt: "Try It"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .general: "gearshape.fill"
+        case .modes: "theatermasks.fill"
+        case .glossary: "character.book.closed.fill"
+        case .popup: "text.bubble.fill"
+        case .hotkeys: "command"
+        case .engine: "cpu.fill"
+        case .tryIt: "text.cursor"
+        }
+    }
+
+    var tint: NSColor {
+        switch self {
+        case .general: Theme.rgb(0x8E8E93)
+        case .modes: Theme.rgb(0xAF52DE)
+        case .glossary: Theme.rgb(0xFF9F0A)
+        case .popup: Theme.rgb(0x0A84FF)
+        case .hotkeys: Theme.rgb(0xFF375F)
+        case .engine: Theme.rgb(0x30D158)
+        case .tryIt: Theme.rgb(0x5E5CE6)
+        }
+    }
+}
+
+/// The pane's page, on the right of Waldo's window.
+struct SettingsPaneView: View {
     let model: AppModel
     @ObservedObject var settings: SettingsStore
     @ObservedObject var permission: AccessibilityPermission
     let models: ModelDownloader
-
-    @State private var page: Page
-
-    init(model: AppModel, settings: SettingsStore, permission: AccessibilityPermission, models: ModelDownloader,
-         initialPage: Page = .general) {
-        self.model = model
-        self.settings = settings
-        self.permission = permission
-        self.models = models
-        _page = State(initialValue: initialPage)
-    }
-
-    enum Page: String, CaseIterable, Identifiable {
-        case general, modes, glossary, popup, hotkeys, engine, tryIt
-
-        var id: String { rawValue }
-
-        var title: String {
-            switch self {
-            case .general: "General"
-            case .modes: "Modes"
-            case .glossary: "Glossary"
-            case .popup: "Popup"
-            case .hotkeys: "Hotkeys"
-            case .engine: "Engine"
-            case .tryIt: "Try It"
-            }
-        }
-
-        var icon: String {
-            switch self {
-            case .general: "gearshape.fill"
-            case .modes: "theatermasks.fill"
-            case .glossary: "character.book.closed.fill"
-            case .popup: "text.bubble.fill"
-            case .hotkeys: "command"
-            case .engine: "cpu.fill"
-            case .tryIt: "text.cursor"
-            }
-        }
-
-        var tint: NSColor {
-            switch self {
-            case .general: Theme.rgb(0x8E8E93)
-            case .modes: Theme.rgb(0xAF52DE)
-            case .glossary: Theme.rgb(0xFF9F0A)
-            case .popup: Theme.rgb(0x0A84FF)
-            case .hotkeys: Theme.rgb(0xFF375F)
-            case .engine: Theme.rgb(0x30D158)
-            case .tryIt: Theme.rgb(0x5E5CE6)
-            }
-        }
-    }
+    let pane: SettingsPane
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
-            Rectangle().fill(Theme.divider).frame(width: 1)
-            Group {
-                switch page {
-                case .general:
-                    GeneralSettingsView(model: model, settings: settings, permission: permission,
-                                        launchAtLogin: model.launchAtLogin)
-                case .modes: ModesSettingsView(settings: settings)
-                case .glossary: GlossarySettingsView(settings: settings)
-                case .popup: PopupSettingsView(settings: settings)
-                case .hotkeys: HotkeySettingsView()
-                case .engine: EngineSettingsView(settings: settings, models: models)
-                case .tryIt: TryItSettingsView(model: model, settings: settings)
-                }
+        Group {
+            switch pane {
+            case .general:
+                GeneralSettingsView(model: model, settings: settings, permission: permission,
+                                    launchAtLogin: model.launchAtLogin)
+            case .modes: ModesSettingsView(settings: settings)
+            case .glossary: GlossarySettingsView(settings: settings)
+            case .popup: PopupSettingsView(settings: settings)
+            case .hotkeys: HotkeySettingsView()
+            case .engine: EngineSettingsView(settings: settings, models: models)
+            case .tryIt: TryItSettingsView(model: model, settings: settings)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .surface(.window)
         }
-        .frame(width: 760, height: 560)
-        .ignoresSafeArea()
-        .tint(Theme.accent)
-        // Theme colors resolve when drawn: a new theme rebuilds the window.
-        .id(settings.appTheme)
+        .frame(maxWidth: 760, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .surface(.window)
     }
+}
 
-    private var sidebar: some View {
+/// Settings' sidebar: back to the chats, then the panes.
+struct SettingsSidebar: View {
+    @Binding var selection: SettingsPane
+    let onBack: () -> Void
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            ForEach(Page.allCases) { item in
-                SidebarItem(page: item, isSelected: page == item) { page = item }
+            Button(action: onBack) {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text("Chats")
+                        .font(.system(size: 12.5, weight: .medium))
+                }
+                .foregroundStyle(Theme.secondaryText)
+                .padding(.horizontal, 7)
+                .frame(height: 28)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Back to your chats")
+            .padding(.bottom, 8)
+            ForEach(SettingsPane.allCases) { item in
+                SidebarItem(page: item, isSelected: selection == item) { selection = item }
             }
             Spacer()
             AppSignature()
@@ -99,15 +104,16 @@ struct SettingsView: View {
         }
         .padding(.horizontal, 10)
         // Leaves room for the traffic lights in the transparent title bar.
-        .padding(.top, 50)
-        .frame(width: 206)
+        .padding(.top, 46)
+        .frame(width: 240)
         .frame(maxHeight: .infinity)
         .surface(.sidebar)
+        .overlay(alignment: .top) { WindowDragArea().frame(height: 40) }
     }
 }
 
 private struct SidebarItem: View {
-    let page: SettingsView.Page
+    let page: SettingsPane
     let isSelected: Bool
     let action: () -> Void
 
@@ -158,6 +164,24 @@ struct AppSignature: View {
     }
 }
 
+private struct ChatsRow: View {
+    @ObservedObject var library: ChatLibrary
+    @State private var confirming = false
+
+    var body: some View {
+        SettingsRow(title: "Saved chats", detail: library.chats.isEmpty ? "None yet." : "\(library.chats.count) saved.") {
+            Button("Delete All…", role: .destructive) { confirming = true }
+                .buttonStyle(.monoDestructive)
+                .disabled(library.chats.isEmpty)
+        }
+        .confirmationDialog("Delete all \(library.chats.count) chats?", isPresented: $confirming) {
+            Button("Delete All Chats", role: .destructive) { library.deleteAll() }
+        } message: {
+            Text("Their messages and captures are removed from this Mac. This can't be undone.")
+        }
+    }
+}
+
 private struct GeneralSettingsView: View {
     let model: AppModel
     @ObservedObject var settings: SettingsStore
@@ -182,13 +206,50 @@ private struct GeneralSettingsView: View {
                             detail: "Text in another language is translated into this one. Text already in it is corrected. Apps can have their own in Modes › Per app.") {
                     MonoMenuPicker(selection: $settings.targetLanguage, options: TargetLanguage.allCases) { $0.displayName }
                 }
+                SettingsDivider()
+                SettingsRow(title: "Explanation language",
+                            detail: "Chats and explanations are answered in this language. A message in another language is answered in that one.") {
+                    MonoMenuPicker(selection: $settings.chatLanguage, options: TargetLanguage.allCases) { $0.displayName }
+                }
+            }
+
+            SettingsSection(title: "Web search",
+                            footer: "Turn it on with the globe button in a chat. Only the search query the model writes leaves your Mac, never your capture or your messages.") {
+                SettingsRow(title: "Search with",
+                            detail: settings.searchProvider == .duckDuckGo
+                                ? "Nothing to set up. If DuckDuckGo starts asking for a captcha, use SearXNG."
+                                : "Your own SearXNG, with JSON results allowed in its settings.yml.") {
+                    MonoMenuPicker(selection: $settings.searchProvider, options: SearchProvider.allCases) { $0.title }
+                }
+                if settings.searchProvider == .searXNG {
+                    SettingsDivider()
+                    SettingsRow(title: "SearXNG address") {
+                        TextField("http://localhost:8888", text: $settings.searXNGURL)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 12.5))
+                            .padding(.horizontal, 8)
+                            .frame(width: 220, height: 27)
+                            .fieldBox()
+                    }
+                }
+            }
+
+            SettingsSection(title: "Chats",
+                            footer: "Chats and their captures are saved only on this Mac, in ~/Library/Application Support/Waldo/Chats.") {
+                ChatsRow(library: model.library)
             }
 
             SettingsSection(title: "Startup") {
+                SettingsRow(title: "Show in menu bar",
+                            detail: "An icon at the top of the screen with Waldo's status, modes and quick actions.") {
+                    Toggle(isOn: $settings.showsMenuBarIcon) { EmptyView() }
+                        .toggleStyle(.mono)
+                }
+                SettingsDivider()
                 SettingsRow(title: "Open at login",
                             detail: launchAtLogin.needsApproval
                                 ? "Turned off in System Settings › General › Login Items. Turn it on there."
-                                : "Waldo starts in the menu bar when you log in.") {
+                                : "Waldo starts in the background when you log in; open its window from the Dock.") {
                     if launchAtLogin.needsApproval {
                         Button("Open Login Items…") { launchAtLogin.openLoginItems() }
                             .buttonStyle(.monoSecondary)
@@ -392,6 +453,22 @@ private struct HotkeySettingsView: View {
                 SettingsDivider()
                 SettingsRow(title: "Selection", detail: "Works on the text you have selected.") {
                     KeyboardShortcuts.Recorder(for: .rephraseSelection)
+                }
+            }
+            SettingsSection(title: "Chat",
+                            footer: "Chats run on the downloaded model. Captures need its vision add-on (Settings › Engine) and Screen Recording permission.") {
+                SettingsRow(title: "New chat", detail: "Ask anything; add captures from the chat.") {
+                    KeyboardShortcuts.Recorder(for: .newChat)
+                }
+                SettingsDivider()
+                SettingsRow(title: "Explain screen region",
+                            detail: "Then drag a rectangle; Esc cancels.") {
+                    KeyboardShortcuts.Recorder(for: .explainScreen)
+                }
+                SettingsDivider()
+                SettingsRow(title: "Explain whole screen",
+                            detail: "Captures the screen under the mouse right away, without dragging.") {
+                    KeyboardShortcuts.Recorder(for: .explainWholeScreen)
                 }
             }
             SettingsSection(title: "Undo",

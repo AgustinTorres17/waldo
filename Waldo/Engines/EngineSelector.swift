@@ -59,6 +59,16 @@ final class EngineSelector {
         return (engine, nil)
     }
 
+    /// The engine for chats, which always use the downloaded model (with its vision
+    /// add-on for captures), whatever handles text. Nil with a reason when it can't run.
+    func chatEngine(needsVision: Bool) async -> (engine: LlamaCppEngine?, reason: String?) {
+        await llamaCpp.configure(model: activeModel, idleUnloadSeconds: settings.llamaIdleUnloadSeconds)
+        if case .unavailable(let reason) = await llamaCpp.chatAvailability(needsVision: needsVision) {
+            return (nil, "Chat runs on a downloaded model. \(reason)")
+        }
+        return (llamaCpp, nil)
+    }
+
     /// Short text for the menu.
     func statusDescription() async -> String {
         let (engines, _) = await candidates()

@@ -21,6 +21,7 @@ final class PopupModel: ObservableObject {
     @Published var isHotkeyRun = false
 
     var onProcess: (ProcessingMode) -> Void = { _ in }
+    var onAsk: () -> Void = {}
     var onReplace: (String) -> Void = { _ in }
     var onCopy: (String) -> Void = { _ in }
     var onClose: () -> Void = {}
@@ -68,8 +69,10 @@ struct PopupView: View {
                 }
                 Rectangle().fill(Theme.divider).frame(width: 1, height: 16)
                     .padding(.horizontal, 4)
-                actionButton("Translate / Correct", icon: "character.bubble.fill", mode: .automatic)
-                actionButton("Rephrase", icon: "wand.and.stars", mode: .rephrase)
+                actionButton("Translate / Correct", icon: "character.bubble.fill") { model.onProcess(.automatic) }
+                actionButton("Rephrase", icon: "wand.and.stars") { model.onProcess(.rephrase) }
+                actionButton("Ask", icon: "bubble.left.and.text.bubble.right") { model.onAsk() }
+                    .help("Ask Waldo about the selected text")
                 closeButton
             }
             .padding(5)
@@ -207,8 +210,8 @@ struct PopupView: View {
         )
     }
 
-    private func actionButton(_ title: String, icon: String, mode: ProcessingMode) -> some View {
-        Button { model.onProcess(mode) } label: {
+    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 11.5, weight: .medium))

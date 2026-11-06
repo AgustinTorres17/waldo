@@ -18,12 +18,49 @@ final class SettingsStore: ObservableObject {
         static let showChanges = "showChanges"
         static let glossary = "glossary"
         static let appTheme = "appTheme"
+        static let chatLanguage = "explainLanguage" // named before Chat existed
+        static let chatSearchesWeb = "explainSearchesWeb"
+        static let chatThinks = "chatThinks"
+        static let searchProvider = "searchProvider"
+        static let searXNGURL = "searXNGURL"
     }
 
     private let defaults: UserDefaults
 
+    /// Read by WaldoApp through @AppStorage to show or hide the menu bar icon.
+    nonisolated static let showsMenuBarIconKey = "showsMenuBarIcon"
+
+    /// Waldo is a Dock app; its menu bar icon is optional.
+    @Published var showsMenuBarIcon: Bool {
+        didSet { defaults.set(showsMenuBarIcon, forKey: Self.showsMenuBarIconKey) }
+    }
+
     @Published var targetLanguage: TargetLanguage {
         didSet { defaults.set(targetLanguage.rawValue, forKey: Key.targetLanguage) }
+    }
+
+    /// The language Explain answers in.
+    @Published var chatLanguage: TargetLanguage {
+        didSet { defaults.set(chatLanguage.rawValue, forKey: Key.chatLanguage) }
+    }
+
+    /// Explain searches the web before answering (the 🌐 button in its panel).
+    @Published var chatSearchesWeb: Bool {
+        didSet { defaults.set(chatSearchesWeb, forKey: Key.chatSearchesWeb) }
+    }
+
+    /// Chat answers think first (the brain button in its panel).
+    @Published var chatThinks: Bool {
+        didSet { defaults.set(chatThinks, forKey: Key.chatThinks) }
+    }
+
+    @Published var searchProvider: SearchProvider {
+        didSet { defaults.set(searchProvider.rawValue, forKey: Key.searchProvider) }
+    }
+
+    /// The user's SearXNG instance, e.g. http://localhost:8888.
+    @Published var searXNGURL: String {
+        didSet { defaults.set(searXNGURL, forKey: Key.searXNGURL) }
     }
 
     @Published var engineMode: EngineMode {
@@ -145,6 +182,13 @@ final class SettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         targetLanguage = defaults.string(forKey: Key.targetLanguage).flatMap(TargetLanguage.init) ?? .english
+        chatLanguage = defaults.string(forKey: Key.chatLanguage).flatMap(TargetLanguage.init)
+            ?? TargetLanguage.preferred ?? .english
+        chatSearchesWeb = defaults.bool(forKey: Key.chatSearchesWeb)
+        chatThinks = defaults.bool(forKey: Key.chatThinks)
+        showsMenuBarIcon = defaults.bool(forKey: Self.showsMenuBarIconKey)
+        searchProvider = defaults.string(forKey: Key.searchProvider).flatMap(SearchProvider.init) ?? .duckDuckGo
+        searXNGURL = defaults.string(forKey: Key.searXNGURL) ?? ""
         engineMode = defaults.string(forKey: Key.engineMode).flatMap(EngineMode.init) ?? .auto
         let idle = defaults.integer(forKey: Key.llamaIdleUnloadSeconds)
         llamaIdleUnloadSeconds = idle > 0 ? idle : 120
