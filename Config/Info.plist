@@ -8,6 +8,8 @@
 	<string>Waldo</string>
 	<key>CFBundleExecutable</key>
 	<string>Waldo</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.agustintorres.waldo</string>
 	<key>CFBundleInfoDictionaryVersion</key>

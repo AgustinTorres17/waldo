@@ -43,6 +43,7 @@ app:
 	rm -rf $(APP)
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Frameworks $(APP)/Contents/Resources
 	cp Config/Info.plist $(APP)/Contents/Info.plist
+	cp Config/AppIcon.icns $(APP)/Contents/Resources/AppIcon.icns
 	printf 'APPL????' > $(APP)/Contents/PkgInfo
 	cp $(BIN_DIR)/Waldo $(APP)/Contents/MacOS/Waldo
 	cp -R $(BIN_DIR)/llama.framework $(APP)/Contents/Frameworks/
