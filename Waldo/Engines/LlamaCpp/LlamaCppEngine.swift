@@ -14,7 +14,8 @@ actor LlamaCppEngine: InferenceEngine {
     private static let seed: UInt32 = 42
     /// Chat answers in detail; this is a long one (~50 s at 20 tokens/s).
     private static let maxChatOutput = 1_024
-    /// Thinking writes its reasoning first, often longer than the answer.
+    /// An answer after thinking, which is often code or a long explanation. The
+    /// reasoning has its own budget on top of this.
     private static let maxThinkingOutput = 4_096
 
     private var model: ModelInfo?
@@ -93,7 +94,7 @@ actor LlamaCppEngine: InferenceEngine {
     }
 
     /// Writes the next step of the last turn of `conversation`.
-    func chat(_ conversation: ChatConversation, instructions: String, onPartial: PartialHandler?) throws -> String {
+    func chat(_ conversation: ChatConversation, instructions: String, onPartial: PartialHandler?) throws -> LoadedModel.Output {
         let needsVision = conversation.turns.contains(where: \.hasImage)
         if case .unavailable(let reason) = chatAvailability(needsVision: needsVision) { throw ChatError.noVisionModel(reason) }
         defer { scheduleUnload() }
@@ -103,7 +104,7 @@ actor LlamaCppEngine: InferenceEngine {
         let output = try loaded.chat(conversation, projector: needsVision ? vision : nil, instructions: instructions,
                                      maxOutput: thinks ? Self.maxThinkingOutput : Self.maxChatOutput, onPartial: onPartial)
         log.info("Chat turn \(conversation.turns.count, privacy: .public): \(output.tokenCount, privacy: .public) tokens in \(ContinuousClock.now - start, privacy: .public)")
-        return output.text
+        return output
     }
 
     /// Frees the chat's memory when its panel closes.
@@ -232,6 +233,8 @@ final class LoadedModel {
         let text: String
         let tokenCount: Int
         let prefixCached: Bool
+        /// It hit a limit instead of finishing, so the text is incomplete.
+        var reachedLimit = false
     }
 
     func generate(prefix: [llama_token], suffix: [llama_token], maxOutput: Int, contextSize: Int,

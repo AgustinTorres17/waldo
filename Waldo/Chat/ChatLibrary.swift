@@ -276,7 +276,7 @@ final class ChatLibrary: ObservableObject {
         task = Task { [weak self, app] in
             do {
                 if chat.turns[index].search != nil {
-                    let rawQuery = try await app.chat(chat, onPartial: nil)
+                    let rawQuery = try await app.chat(chat, onPartial: nil).text
                     chat.turns[index].search?.rawQuery = rawQuery
                     let query = chat.turns[index].search?.query ?? ""
                     if chat.turns[index].search?.isSkipped == true {
@@ -299,7 +299,8 @@ final class ChatLibrary: ObservableObject {
                 }
                 let answer = try await app.chat(chat, onPartial: onPartial)
                 guard !Task.isCancelled, let self else { return }
-                chat.turns[index].answer = answer
+                chat.turns[index].answer = answer.text
+                if answer.reachedLimit { chat.turns[index].wasCut = true }
                 chat.updatedAt = .now
                 self.update(chat, phase: .done)
                 self.finishRun(chat)
