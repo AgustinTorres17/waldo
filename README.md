@@ -2,13 +2,15 @@
 
 Correct, translate and rephrase what you write, in any app on your Mac. Waldo runs on your computer: no account, no servers, no subscription.
 
-**[Website](https://agustintorres17.github.io/waldo-landing/)**
+**[Website](https://waldoai.vercel.app/)**
+
+[![Waldo correcting an email in the selection popup](.github/demo.jpg)](https://waldoai.vercel.app/)
 
 - **Correct and translate** selected text in 9 languages, and review every change before replacing it.
 - **Rephrase** to say the same thing better.
 - **Modes** for how you want to sound, with a mode and language per app.
 - **Glossary** for the words that must stay as they are.
-- **Chat** with Waldo about selected text or anything on screen, with optional web search.
+- **Chat** with Waldo about selected text, images or anything on screen, with optional web search.
 - **Hotkeys** for everything, and undo for the last replacement.
 
 ## Install
