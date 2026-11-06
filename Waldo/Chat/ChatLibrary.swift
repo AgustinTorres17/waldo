@@ -148,9 +148,11 @@ final class ChatLibrary: ObservableObject {
     /// Waldo's window out of the way. Says why not next to the mouse if it can't.
     func capture(wholeScreen: Bool, hiding window: NSWindow?) async -> ChatImage? {
         guard await canCapture() else { return nil }
-        let wasVisible = window?.isVisible == true
-        window?.orderOut(nil)
-        defer { if wasVisible { window?.makeKeyAndOrderFront(nil) } }
+        // A window on another desktop is already out of the way, and showing it
+        // again would switch to that desktop.
+        let hidden = window?.isVisible == true && window?.isOnActiveSpace == true
+        if hidden { window?.orderOut(nil) }
+        defer { if hidden { window?.makeKeyAndOrderFront(nil) } }
         guard #available(macOS 14.0, *) else { return nil }
         let selection: RegionSelector.Selection
         if wholeScreen {
@@ -169,6 +171,31 @@ final class ChatLibrary: ObservableObject {
             app.flash(note: "Couldn't capture the screen: \(error.localizedDescription)", anchor: Self.mouseAnchor, isError: true)
             return nil
         }
+    }
+
+    /// Attaches the image on the clipboard. False when there's none, so that
+    /// the paste goes on as usual.
+    func pasteImage() -> Bool {
+        guard let image = ImageImport.imageOnClipboard() else { return false }
+        Task { await attach(image) }
+        return true
+    }
+
+    func chooseImage() {
+        guard let url = ImageImport.chooseFile() else { return }
+        guard let image = ImageImport.image(fromFile: url) else {
+            app.flash(note: "Couldn't read that image. Try a PNG or JPEG.", anchor: Self.mouseAnchor, isError: true)
+            return
+        }
+        Task { await attach(image) }
+    }
+
+    private func attach(_ image: ChatImage) async {
+        if let reason = await app.chatUnavailableReason(needsVision: true) {
+            app.flash(note: reason, anchor: Self.mouseAnchor, isError: true)
+            return
+        }
+        pendingImage = image
     }
 
     private static var mouseAnchor: CGRect {

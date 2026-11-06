@@ -18,8 +18,8 @@ final class RegionSelector {
         finish(nil) // a selection already running is cancelled
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
-            // Key events (Esc) need Waldo active; the controller gives focus back later.
-            NSApp.activate(ignoringOtherApps: true)
+            // Waldo isn't activated: that would switch to the desktop its window is on.
+            // The overlays are non-activating panels, so they still get Esc.
             let mouse = NSEvent.mouseLocation
             for screen in NSScreen.screens {
                 let window = OverlayWindow(screen: screen) { [weak self] rect in
@@ -43,10 +43,11 @@ final class RegionSelector {
     }
 }
 
-private final class OverlayWindow: NSWindow {
+private final class OverlayWindow: NSPanel {
     init(screen: NSScreen, onFinish: @escaping (CGRect?) -> Void) {
-        super.init(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        super.init(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         level = .screenSaver
+        hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         isOpaque = false
         backgroundColor = .clear

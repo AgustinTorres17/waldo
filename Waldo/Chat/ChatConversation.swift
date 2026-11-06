@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// A screen capture: the pixels as the vision projector wants them (8-bit RGB,
+/// A capture or an added image: the pixels as the vision projector wants them (8-bit RGB,
 /// row by row) and the image itself for previews.
 struct ChatImage: @unchecked Sendable, Equatable { // CGImage is immutable
     let id: UUID
@@ -20,6 +20,9 @@ struct ChatImage: @unchecked Sendable, Equatable { // CGImage is immutable
             guard let context = CGContext(data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
                                           bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
                                           bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
+            // Black text on a transparent image would otherwise end up on black.
+            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
             return true
         }

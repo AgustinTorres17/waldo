@@ -172,6 +172,7 @@ private struct Composer: View {
     @ObservedObject var settings: SettingsStore
     let onCapture: () -> Void
     @FocusState private var focused: Bool
+    @State private var pasteMonitor: Any?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -191,6 +192,12 @@ private struct Composer: View {
                 }
                 .buttonStyle(.icon)
                 .help("Add a capture of your screen to the next message")
+                Button(action: library.chooseImage) {
+                    Image(systemName: "paperclip")
+                        .foregroundStyle(Theme.secondaryText)
+                }
+                .buttonStyle(.icon)
+                .help("Add an image from your Mac. You can also paste one.")
                 toggle($settings.chatSearchesWeb, icon: "globe", title: "Search",
                        on: "Searching the web is on: only the search query leaves your Mac. Click to turn it off.",
                        off: "Search the web before answering")
@@ -218,8 +225,29 @@ private struct Composer: View {
         .background(Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.border))
         .shadow(color: .black.opacity(Theme.isGlass ? 0.06 : 0), radius: 6, y: 2)
-        .onAppear { focused = true }
+        .onAppear {
+            focused = true
+            startWatchingPaste()
+        }
+        .onDisappear(perform: stopWatchingPaste)
         .onChange(of: library.current.id) { _ in focused = true }
+    }
+
+    /// A text field ignores a pasted image, so ⌘V is looked at before it gets there.
+    private func startWatchingPaste() {
+        guard pasteMonitor == nil else { return }
+        pasteMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [library] event in
+            let isPaste = event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
+                && event.charactersIgnoringModifiers?.lowercased() == "v"
+            guard isPaste, event.window is MainWindow else { return event }
+            let pasted = MainActor.assumeIsolated { library.pasteImage() }
+            return pasted ? nil : event
+        }
+    }
+
+    private func stopWatchingPaste() {
+        if let pasteMonitor { NSEvent.removeMonitor(pasteMonitor) }
+        pasteMonitor = nil
     }
 
     private var canSend: Bool {
