@@ -1,4 +1,4 @@
-# [APP_NAME] — Research
+# Waldo — Research
 
 *Research date: 2026-10-02. Research only: no application code or project scaffolding has been written.*
 
