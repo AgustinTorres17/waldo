@@ -20,6 +20,25 @@ struct ModeRuleTests {
         #expect(settings.mode(for: nil) == work)
     }
 
+    @Test func modesAndRulesSurviveARestart() {
+        let defaults = UserDefaults(suiteName: "mode-restart-\(UUID())")!
+        let first = SettingsStore(defaults: defaults)
+        let work = first.customModes[0]
+        first.activeModeID = work.id
+        first.appModeRules = [AppRule(bundleID: "com.tinyspeck.slackmacgap", modeID: work.id)]
+
+        let restarted = SettingsStore(defaults: defaults)
+        #expect(restarted.customModes.map(\.id) == first.customModes.map(\.id))
+        #expect(restarted.mode(for: "com.tinyspeck.slackmacgap") == work)
+        #expect(restarted.mode(for: nil) == work)
+    }
+
+    @Test func deletedStartersStayDeleted() {
+        let defaults = UserDefaults(suiteName: "mode-delete-\(UUID())")!
+        SettingsStore(defaults: defaults).customModes = []
+        #expect(SettingsStore(defaults: defaults).customModes.isEmpty)
+    }
+
     @Test func pickerChangesTheRuleOrTheDefault() {
         let settings = store()
         let (work, friends) = (settings.customModes[0], settings.customModes[1])

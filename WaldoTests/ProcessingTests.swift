@@ -14,6 +14,14 @@ struct ProtectedSpansTests {
 
     @Test func restoresSigilWhenBareNameAppearsOnce() {
         let input = "The tests pass and @maria approved it"
+        #expect(ProtectedSpans.restoringSigils(in: "@here please test staging.", input: "@aquí please test staging")
+                == "@aquí please test staging.")
+        #expect(ProtectedSpans.restoringSigils(in: "Please test staging.", input: "@aquí please test staging")
+                == "@aquí Please test staging.")
+        #expect(ProtectedSpans.restoringSigils(in: "Ask @ana and @bruno.", input: "Ask @ana and @luis")
+                == "Ask @ana and @luis.")
+        #expect(ProtectedSpans.restoringSigils(in: "Please tell @ana and @bruno.", input: "Please tell @luis")
+                == "Please tell @ana and @bruno.")
         #expect(ProtectedSpans.restoringSigils(in: "The tests pass and Maria approved it.", input: input)
                 == "The tests pass and @maria approved it.")
     }
@@ -85,7 +93,7 @@ struct OutputValidatorTests {
         #expect(OutputValidator.validate(formal, input: input, task: .correct, target: .english) != .valid(formal))
         #expect(OutputValidator.validate(formal, input: input, task: .correct, target: .english, allowsRewording: true)
                 == .valid(formal))
-        #expect(OutputValidator.validate("Could you please check it?", input: "@ana can u check it?", task: .correct,
+        #expect(OutputValidator.validate("Could you please check it?", input: "can u check it, @ana?", task: .correct,
                                          target: .english, allowsRewording: true)
                 == .invalid("The result lost or changed mentions, links, emoji or code."))
     }

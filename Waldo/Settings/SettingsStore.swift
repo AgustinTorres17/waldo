@@ -203,11 +203,21 @@ final class SettingsStore: ObservableObject {
         let theme = defaults.string(forKey: Key.appTheme).flatMap(AppTheme.init) ?? .glass
         appTheme = theme
         Theme.current = theme
-        appModeRules = defaults.data(forKey: Key.appModeRules)
-            .flatMap { try? JSONDecoder().decode([AppRule].self, from: $0) } ?? []
-        // Starter modes on first launch only, so deleting them sticks.
-        customModes = defaults.data(forKey: Key.customModes)
-            .flatMap { try? JSONDecoder().decode([CustomMode].self, from: $0) } ?? CustomMode.starters
-        activeModeID = defaults.string(forKey: Key.activeModeID).flatMap(UUID.init)
+        // Starter modes on first launch only, so deleting them sticks. didSet doesn't
+        // run here: they're saved by hand, or rules would lose them on the next launch.
+        let savedModes = defaults.data(forKey: Key.customModes)
+            .flatMap { try? JSONDecoder().decode([CustomMode].self, from: $0) }
+        let modes = savedModes ?? CustomMode.starters
+        if savedModes == nil { defaults.set(try? JSONEncoder().encode(modes), forKey: Key.customModes) }
+        customModes = modes
+        // Earlier versions lost their modes on restart, leaving these pointing to nothing.
+        let modeIDs = Set(modes.map(\.id))
+        activeModeID = defaults.string(forKey: Key.activeModeID).flatMap(UUID.init).flatMap { modeIDs.contains($0) ? $0 : nil }
+        appModeRules = (defaults.data(forKey: Key.appModeRules)
+            .flatMap { try? JSONDecoder().decode([AppRule].self, from: $0) } ?? []).map { rule in
+                var rule = rule
+                if let id = rule.modeID, !modeIDs.contains(id) { rule.modeID = nil }
+                return rule
+            }
     }
 }

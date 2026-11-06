@@ -49,9 +49,39 @@ enum ProtectedSpans {
         return missing
     }
 
-    /// Models often turn "@maria" into "Maria". When a missing @mention or
-    /// #channel appears exactly once as a bare word, put the sigil back.
+    /// Puts back the @mentions and #channels a model changed, since they have to
+    /// reach the app as they were written:
+    /// - "@maria" turned into "Maria": a bare word that appears exactly once.
+    /// - "@aquí" translated to "@here": as many new mentions as lost ones.
+    /// - A mention opening the text dropped altogether.
     static func restoringSigils(in output: String, input: String) -> String {
+        let bareWordsRestored = restoringBareWords(in: output, input: input)
+        let replaced = ["@", "#"].reduce(bareWordsRestored) { undoingReplacements(in: $0, input: input, sigil: $1) }
+        return restoringOpeningSpan(in: replaced, input: input)
+    }
+
+    private static func undoingReplacements(in output: String, input: String, sigil: String) -> String {
+        let lost = missing(from: output, input: input).filter { $0.hasPrefix(sigil) }
+        let inputSpans = Set(find(in: input))
+        let added = find(in: output).filter { $0.hasPrefix(sigil) && !inputSpans.contains($0) }
+        guard !lost.isEmpty, lost.count == added.count else { return output }
+        var result = output
+        for (original, changed) in zip(lost, added) {
+            if let range = result.range(of: changed) { result.replaceSubrange(range, with: original) }
+        }
+        return result
+    }
+
+    private static func restoringOpeningSpan(in output: String, input: String) -> String {
+        guard !output.isEmpty else { return output }
+        let opening = missing(from: output, input: input).first { span in
+            (span.hasPrefix("@") || span.hasPrefix("#"))
+                && input.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(span)
+        }
+        return opening.map { "\($0) \(output)" } ?? output
+    }
+
+    private static func restoringBareWords(in output: String, input: String) -> String {
         var result = output
         for span in missing(from: output, input: input) where span.count > 1 && (span.hasPrefix("@") || span.hasPrefix("#")) {
             let bare = NSRegularExpression.escapedPattern(for: String(span.dropFirst()))

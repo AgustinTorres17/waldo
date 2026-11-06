@@ -20,9 +20,9 @@ struct CustomMode: Codable, Identifiable, Hashable, Sendable {
     }
 
     static let starters = [
-        CustomMode(name: "Work",
+        CustomMode(id: UUID(uuidString: "0B7C1E5A-6F4D-4E21-9A3B-5D2C8E1F7A01")!, name: "Work",
                    guidelines: "Professional but friendly, like a message to a coworker on Slack. Clear and direct. No slang or profanity."),
-        CustomMode(name: "Friends",
+        CustomMode(id: UUID(uuidString: "0B7C1E5A-6F4D-4E21-9A3B-5D2C8E1F7A02")!, name: "Friends",
                    guidelines: "Casual and relaxed, like texting a friend. Contractions and everyday words. Never formal or stiff."),
     ]
 }
