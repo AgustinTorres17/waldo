@@ -38,8 +38,6 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         let window = MainWindow(contentRect: CGRect(x: 0, y: 0, width: 1_000, height: 700),
                                 styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                                 backing: .buffered, defer: false)
-        // Opens on the desktop you're on instead of switching to the one it was left on.
-        window.collectionBehavior.insert(.moveToActiveSpace)
         window.contentViewController = NSHostingController(rootView: view)
         window.title = "Waldo"
         window.titlebarAppearsTransparent = true

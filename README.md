@@ -29,8 +29,10 @@ xcode-select --install
 git clone https://github.com/AgustinTorres17/waldo.git
 cd waldo
 make install
-open /Applications/Waldo.app
+make open
 ```
+
+Waldo goes to `/Applications`, or to `Applications` in your home folder if your user isn't an administrator.
 
 **3. Allow Accessibility.** Waldo asks for it when it opens: turn it on in System Settings › Privacy & Security › Accessibility. Waldo needs it to read your selection and replace the text.
 
@@ -50,7 +52,7 @@ cd waldo
 git pull
 make install
 tccutil reset Accessibility com.agustintorres.waldo
-open /Applications/Waldo.app
+make open
 ```
 
 Allow Accessibility again when Waldo asks. macOS forgets the permission after each build, unless you have an Apple Development certificate in your keychain.

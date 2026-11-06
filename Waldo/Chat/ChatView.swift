@@ -171,7 +171,7 @@ private struct Composer: View {
     @ObservedObject var library: ChatLibrary
     @ObservedObject var settings: SettingsStore
     let onCapture: () -> Void
-    @FocusState private var focused: Bool
+    @State private var textHeight: CGFloat = 18
     @State private var pasteMonitor: Any?
 
     var body: some View {
@@ -179,12 +179,17 @@ private struct Composer: View {
             if library.pendingQuote != nil || (library.pendingImage != nil && !library.current.turns.isEmpty) {
                 attachments
             }
-            TextField(placeholder, text: $library.draft, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13.5))
-                .lineLimit(1...8)
-                .focused($focused)
-                .onSubmit(library.send)
+            ComposerTextField(text: $library.draft, height: $textHeight, focusID: library.current.id,
+                              onSubmit: library.send)
+                .frame(height: textHeight)
+                .overlay(alignment: .topLeading) {
+                    if library.draft.isEmpty {
+                        Text(placeholder)
+                            .font(.system(size: 13.5))
+                            .foregroundStyle(Theme.tertiaryText)
+                            .allowsHitTesting(false)
+                    }
+                }
             HStack(spacing: 2) {
                 Button(action: onCapture) {
                     Image(systemName: "camera.viewfinder")
@@ -225,12 +230,8 @@ private struct Composer: View {
         .background(Theme.field, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.border))
         .shadow(color: .black.opacity(Theme.isGlass ? 0.06 : 0), radius: 6, y: 2)
-        .onAppear {
-            focused = true
-            startWatchingPaste()
-        }
+        .onAppear(perform: startWatchingPaste)
         .onDisappear(perform: stopWatchingPaste)
-        .onChange(of: library.current.id) { _ in focused = true }
     }
 
     /// A text field ignores a pasted image, so ⌘V is looked at before it gets there.

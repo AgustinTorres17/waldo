@@ -3,7 +3,8 @@
 #   make run       build, assemble build/Waldo.app, sign it and open it
 #   make app       same, without opening
 #   make test      run the unit tests (eval: make test WALDO_EVAL=1)
-#   make install   copy Waldo.app to /Applications
+#   make install   copy Waldo.app to /Applications, or ~/Applications without admin rights
+#   make open      open the installed copy
 #   make clean
 #
 # Signing: uses your "Apple Development" identity when the keychain has one, so the
@@ -14,6 +15,9 @@
 CONFIG   ?= release
 APP      := build/Waldo.app
 BIN_DIR   = $(shell swift build -c $(CONFIG) --show-bin-path)
+
+# Only administrators can write to /Applications.
+INSTALL_DIR ?= $(shell test -w /Applications && echo /Applications || echo "$(HOME)/Applications")
 
 SIGN_IDENTITY ?= $(shell security find-identity -v -p codesigning 2>/dev/null \
 	| sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | head -1)
@@ -34,7 +38,7 @@ TEST_FLAGS := -Xswiftc -F -Xswiftc $(CLT_DEV)/Frameworks \
 	-Xlinker -rpath -Xlinker $(CLT_DEV)/usr/lib
 endif
 
-.PHONY: all app run test install clean
+.PHONY: all app run test install open clean
 
 all: app
 
@@ -61,8 +65,13 @@ test:
 	$(if $(WALDO_EVAL),WALDO_EVAL=$(WALDO_EVAL)) $(if $(WALDO_EVAL_ONLY),WALDO_EVAL_ONLY=$(WALDO_EVAL_ONLY)) swift test $(TEST_FLAGS)
 
 install: app
-	rm -rf /Applications/Waldo.app
-	cp -R $(APP) /Applications/Waldo.app
+	mkdir -p "$(INSTALL_DIR)"
+	rm -rf "$(INSTALL_DIR)/Waldo.app"
+	cp -R $(APP) "$(INSTALL_DIR)/Waldo.app"
+	@echo "Installed in $(INSTALL_DIR)"
+
+open:
+	open "$(INSTALL_DIR)/Waldo.app"
 
 clean:
 	rm -rf .build build

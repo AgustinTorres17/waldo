@@ -25,8 +25,10 @@ actor LlamaCppEngine: InferenceEngine {
     private var unloadTask: Task<Void, Never>?
     private let log = Logger(subsystem: "com.agustintorres.waldo", category: "llama")
 
+    /// The first launch of a build compiles the Metal shaders, which takes seconds
+    /// and would freeze the window if it ran on the main thread.
     init() {
-        LlamaBackend.initialize()
+        Task.detached(priority: .utility) { LlamaBackend.initialize() }
     }
 
     /// The model to use (nil: none installed) and how long it may stay loaded unused.
@@ -201,6 +203,7 @@ final class LoadedModel {
     private static let prefixCacheLimit = 2
 
     init?(info: ModelInfo) {
+        LlamaBackend.initialize()
         var params = llama_model_default_params()
         params.n_gpu_layers = -1 // everything on Metal
         guard let model = llama_model_load_from_file(ModelCatalog.fileURL(for: info).path, params),
