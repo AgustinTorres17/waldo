@@ -20,14 +20,14 @@ struct ChatIntegrationTests {
         let instructions = ChatPrompts.instructions(language: .spanish, conversation: ChatConversation())
 
         var start = ContinuousClock.now
-        let first = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let first = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         print("---- first answer (\(ContinuousClock.now - start)) ----\n\(first)")
         #expect(first.contains("items"))
 
         conversation.turns[0].answer = first
         conversation.turns.append(ChatTurn(question: "¿En qué línea está el error? Respondé solo el número."))
         start = .now
-        let second = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let second = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         let followUpTime = ContinuousClock.now - start
         print("---- follow-up (\(followUpTime)) ----\n\(second)")
         #expect(second.contains("42"))
@@ -48,7 +48,7 @@ struct ChatIntegrationTests {
         var conversation = ChatConversation(turns: [ChatTurn(question: "que dices, vale la pena usar zed?", image: image)])
         let instructions = ChatPrompts.instructions(language: .spanish, conversation: ChatConversation())
         for followUp in ["y comparado con cursor?", "cual me recomendas para empezar?"] {
-            let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+            let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
             print("---- turn \(conversation.turns.count) ----\n\(answer)")
             #expect(!answer.lowercased().contains("waldo"))
             #expect(!answer.lowercased().hasPrefix("¡hola") && !answer.lowercased().hasPrefix("hola"))
@@ -72,7 +72,7 @@ struct ChatIntegrationTests {
         ])
         let instructions = ChatPrompts.instructions(language: .spanish, conversation: ChatConversation())
         var start = ContinuousClock.now
-        let rawQuery = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let rawQuery = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         conversation.turns[0].search?.rawQuery = rawQuery
         let query = try #require(conversation.turns[0].search?.query)
         print("---- query (\(ContinuousClock.now - start)): \(query)")
@@ -82,7 +82,7 @@ struct ChatIntegrationTests {
         results.forEach { print("  \($0.title) — \($0.url)") }
         conversation.turns[0].search?.results = results
         start = .now
-        let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         print("---- answer (\(ContinuousClock.now - start)) ----\n\(answer)")
         #expect(!results.isEmpty)
         #expect(answer.range(of: #"\[\d\]"#, options: String.CompareOptions.regularExpression) != nil)
@@ -96,13 +96,13 @@ struct ChatIntegrationTests {
         await engine.configure(model: ModelCatalog.qwen35_4B, idleUnloadSeconds: 60)
         let instructions = ChatPrompts.instructions(language: .spanish, conversation: ChatConversation())
         var conversation = ChatConversation(turns: [ChatTurn(question: "Mi perro se llama Toby. Respondé solo: ok.")])
-        conversation.turns[0].answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        conversation.turns[0].answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         print("---- text turn: \(conversation.turns[0].answer)")
 
         let image = try #require(ChatImage(Self.render("Order #8812 shipped on 2026-10-13 via DHL")))
         conversation.turns.append(ChatTurn(question: "¿Qué número de pedido aparece? ¿Y cómo se llama mi perro?", image: image))
         let start = ContinuousClock.now
-        let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         print("---- with capture (\(ContinuousClock.now - start)) ----\n\(answer)")
         #expect(answer.contains("8812"))
         #expect(answer.contains("Toby"))
@@ -116,16 +116,16 @@ struct ChatIntegrationTests {
         var conversation = ChatConversation(openedFrom: "Slack")
         conversation.turns = [ChatTurn(question: "quien eres?", search: SearchStep())]
         let instructions = ChatPrompts.instructions(language: .spanish, conversation: conversation)
-        let rawQuery = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let rawQuery = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         conversation.turns[0].search?.rawQuery = rawQuery
         print("---- query: \(rawQuery)")
         #expect(conversation.turns[0].search?.isSkipped == true)
-        let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let answer = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         print("---- answer: \(answer)")
         #expect(answer.contains("Waldo"))
         conversation.turns[0].answer = answer
         conversation.turns.append(ChatTurn(question: "ultimas noticias sobre el iphone 18", search: SearchStep()))
-        let newsQuery = try await engine.chat(conversation, instructions: instructions, onPartial: nil)
+        let newsQuery = try await engine.chat(conversation, instructions: instructions, onPartial: nil).text
         print("---- news query: \(newsQuery)")
         conversation.turns[1].search?.rawQuery = newsQuery
         #expect(conversation.turns[1].search?.isSkipped == false)
@@ -141,7 +141,7 @@ struct ChatIntegrationTests {
         ])
         let start = ContinuousClock.now
         conversation.turns[0].answer = try await engine.chat(conversation, instructions: ChatPrompts.instructions(language: .spanish, conversation: ChatConversation()),
-                                                             onPartial: nil)
+                                                             onPartial: nil).text
         let turn = conversation.turns[0]
         print("---- thinking (\(ContinuousClock.now - start)) ----\nREASONING: \(turn.reasoning ?? "")\nREPLY: \(turn.reply)")
         #expect(!(turn.reasoning ?? "").isEmpty)
@@ -369,5 +369,20 @@ struct ChatStoreTests {
         #expect(chat.displayTitle == "per se")
         chat.title = "Latin phrases"
         #expect(chat.displayTitle == "Latin phrases")
+    }
+}
+
+struct ChatTurnDecodingTests {
+    @Test func aChatSavedBeforeCutAnswersExistedStillOpens() throws {
+        let json = #"{"question":"Hi","answer":"Hello","thinks":false}"#
+        let turn = try JSONDecoder().decode(ChatTurn.self, from: Data(json.utf8))
+        #expect(turn.wasCut == nil)
+    }
+
+    @Test func aCutAnswerStaysMarkedAfterSaving() throws {
+        var turn = ChatTurn(question: "Hi", answer: "Hel")
+        turn.wasCut = true
+        let saved = try JSONDecoder().decode(ChatTurn.self, from: JSONEncoder().encode(turn))
+        #expect(saved.wasCut == true)
     }
 }

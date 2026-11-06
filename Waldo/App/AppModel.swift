@@ -211,7 +211,7 @@ final class AppModel: ObservableObject {
         await engineSelector.chatEngine(needsVision: needsVision).reason
     }
 
-    func chat(_ conversation: ChatConversation, onPartial: PartialHandler?) async throws -> String {
+    func chat(_ conversation: ChatConversation, onPartial: PartialHandler?) async throws -> LoadedModel.Output {
         let needsVision = conversation.turns.contains(where: \.hasImage)
         guard let engine = await engineSelector.chatEngine(needsVision: needsVision).engine else {
             throw ChatError.noVisionModel(await chatUnavailableReason(needsVision: needsVision) ?? "Chat is unavailable.")

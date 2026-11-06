@@ -99,7 +99,7 @@ extension LoadedModel {
 
         let thinks = step == .answer && conversation.turns.last?.thinks == true
         let limit = step == .searchQuery ? Self.maxQueryTokens : maxOutput
-        let output = try generate(in: session, maxOutput: min(limit, Self.chatContextSize - session.usedTokens),
+        let output = try generate(in: session, maxOutput: limit,
                                   stopsAtNewline: step == .searchQuery, thinks: thinks, onPartial: onPartial)
         session.transcript += output.text
         session.isIncomplete = false
@@ -194,6 +194,7 @@ extension LoadedModel {
     /// Samples until end of turn (or a line break, for a query), decoding each
     /// token at an explicit position (M-RoPE). The text returned is exactly what's
     /// now in the context: a token with a line break that stops it isn't kept.
+    /// `maxOutput` counts the answer alone, so reasoning can't use up its room.
     private func generate(in session: ChatSession, maxOutput: Int, stopsAtNewline: Bool, thinks: Bool,
                           onPartial: PartialHandler?) throws -> Output {
         let sampler = Self.makeChatSampler(thinks: thinks)
@@ -203,11 +204,17 @@ extension LoadedModel {
 
         var bytes: [UInt8] = []
         var produced = 0
+        var answerTokens = 0
+        var reachedLimit = false
         var piece = [CChar](repeating: 0, count: 256)
         var isThinking = thinks
         let closeTag = Array("</think>".utf8)
-        while produced < maxOutput {
+        while true {
             if Task.isCancelled { throw CancellationError() }
+            if answerTokens >= maxOutput || session.usedTokens >= Self.chatContextSize {
+                reachedLimit = true
+                break
+            }
             if isThinking, produced >= Self.thinkingBudget {
                 try decodeText(Self.thinkingCutoff, addSpecial: false, in: session)
                 bytes.append(contentsOf: Self.thinkingCutoff.utf8)
@@ -216,6 +223,7 @@ extension LoadedModel {
             let token = llama_sampler_sample(sampler, session.context, -1)
             if llama_vocab_is_eog(vocab, token) { break }
             produced += 1
+            if !isThinking { answerTokens += 1 }
 
             let length = llama_token_to_piece(vocab, token, &piece, Int32(piece.count), 0, false)
             let pieceBytes = length > 0 ? piece.prefix(Int(length)).map { UInt8(bitPattern: $0) } : []
@@ -236,7 +244,8 @@ extension LoadedModel {
             session.nextPosition += 1
             session.usedTokens += 1
         }
-        return Output(text: String(decoding: bytes, as: UTF8.self), tokenCount: produced, prefixCached: false)
+        return Output(text: String(decoding: bytes, as: UTF8.self), tokenCount: produced, prefixCached: false,
+                      reachedLimit: reachedLimit)
     }
 
     /// Qwen3.5's recommended sampling, with and without thinking: long free-form

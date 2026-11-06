@@ -351,6 +351,13 @@ private struct ChatTranscript: View {
                         if !turn.reply.isEmpty {
                             MarkdownText(turn.reply, sources: turn.search?.results?.map(\.url) ?? [])
                         }
+                        if turn.wasCut == true {
+                            Label("Waldo reached its length limit, so this answer is incomplete.",
+                                  systemImage: "exclamationmark.triangle")
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(Theme.secondaryText)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         if let results = turn.search?.results, !results.isEmpty, !turn.reply.isEmpty {
                             SourceList(results: results)
                         }

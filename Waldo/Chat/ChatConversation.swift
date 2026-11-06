@@ -58,6 +58,9 @@ struct ChatTurn: Sendable, Equatable, Codable {
     var search: SearchStep?
     /// Qwen3.5 reasons before answering: slower, better on hard questions.
     var thinks: Bool
+    /// The answer hit the length limit before it finished. Optional so that
+    /// chats saved before this existed still open.
+    var wasCut: Bool?
 
     init(question: String, answer: String = "", image: ChatImage? = nil, quote: String? = nil,
          search: SearchStep? = nil, thinks: Bool = false) {
@@ -71,7 +74,7 @@ struct ChatTurn: Sendable, Equatable, Codable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case question, answer, imageID, quote, search, thinks
+        case question, answer, imageID, quote, search, thinks, wasCut
     }
 
     /// Has a capture, loaded or not.
